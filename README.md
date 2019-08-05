@@ -11,7 +11,7 @@ Ur is an ancient board game. See [this video](https://www.youtube.com/watch?v=WZ
 ## The game
 ### Board setup
 
-The game is played on a board consisting of an 8 x 3 grid with four squares missing at the following positions: (4,0),(5,0),(4,2),(5,2). Positions (0,0),(0,2),(3,1),(0,6), and (2,6) have "rosettes", decorative flowers, on them which affect gameplay. The board looks like this:
+The game is played on a board consisting of an 8 x 3 grid with four squares missing at the following positions: (4,0),(5,0),(4,2),(5,2). Positions (0,0),(0,2),(3,1),(6,0), and (6,2) have "rosettes", decorative flowers, on them which affect gameplay. The board looks like this:
 
 | [\*] | [ ] | [ ] | [ ]  |     |     | [\*] | [ ] |
 |------|-----|-----|------|-----|-----|------|-----|
