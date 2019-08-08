@@ -29,7 +29,7 @@ pub struct GameState {
     // May be helpful to split this into state for each player
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson)]
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq)]
 pub struct Token {
     pub x: usize,
     pub y: usize,
@@ -52,46 +52,7 @@ impl GameState {
         "".to_string()
     }
 
-    // takes token location, distance, and player and returns the location where a token at the
-    // given location will land if moved the given distance by the given player.
-    pub fn incrementLocation(x: usize, y: usize, distance: usize, player: usize) -> (usize, usize) {
-
-        let mut location = (x, y)
-
-        fn step(x: usize, y: usize, player: usize) {
-            match (x, y) {
-                // merge
-                (0,0|2) => return (0,1),
-                //split
-                (7,1) => {
-                    if player == 1 {
-                        return (7,0);
-                    } else {
-                        return (7,2);
-                    }
-                },
-                // middle row
-                (_,1) => return (x+1,y),
-                // outside rows (only thing left)
-                (_,_) => return (x-1,y),
-            }
-        }
-
-        for n in 1..=distance {
-            location = step(location[0], location[1], player);
-        }
-
-        return location;
-    }
-
-    // test whether a token moved a given distance from a given location will go home.
-    fn isHoming(x: usize, y: usize, distance: usize) -> bool {
-        // player doesn't matter when calculating whether token homes
-        let newLocation = incrementLocation(x, y, distance, 1);
-        return (newLocation == (5,0) || newLocation == (5,2));
-    }
-
-    pub fn evolve(&self, _game: Game, next_move: &Move) -> GameState {
+    pub fn evolve(&self, game: Game, next_move: &Move) -> GameState {
         // <<DEVCAMP>>
         // given a current state, a game and a move, compute the next state
         // You can assume all moves are valid
@@ -100,7 +61,7 @@ impl GameState {
         let mut p1_tokens = self.p1_tokens.clone();
         let mut p1_home = self.p1_home.clone();
         let mut p2_tokens = self.p2_tokens.clone();
-        let mut p1_home = self.p1_home.clone();
+        let mut p2_home = self.p2_home.clone();
 
         // add new move to the list of all moves
         moves.push(next_move.clone());
@@ -108,7 +69,7 @@ impl GameState {
         // update state according to move
         match next_move.move_type {
             MoveType::MoveToken{x, y, distance} => {
-                if isHoming(x, y, distance) {
+                if is_homing(x, y, distance) {
                     // if token is going home
                     if game.player_1 == next_move.author {
                         p1_home += 1;
@@ -119,24 +80,28 @@ impl GameState {
                     // else token is moving
                     if game.player_1 == next_move.author {
                         // remove token at old location
-                        p1_tokens.retain(|&token| (token.x, token.y) != (x,y));
+                        // p1_tokens.retain(|&token| (token.x, token.y) != (x,y));
+                        p1_tokens.retain(|token| (token.x, token.y) != (x,y));
                         // add token at new location
-                        let (newX, newY) = incrementLocation(x, y, distance, 1);
-                        p1_tokens.push(Token{newX, newY});
+                        let (new_x, new_y) = increment_location(x, y, distance, 1);
+                        p1_tokens.push(Token{x: new_x, y: new_y});
                     } else {
                         // remove token at old location
-                        p2_tokens.retain(|&token| (token.x, token.y) != (x,y));
+                        // p2_tokens.retain(|&token| (token.x, token.y) != (x,y));
+                        p2_tokens.retain(|token| (token.x, token.y) != (x,y));
                         // add token at new location
-                        let (newX, newY) = incrementLocation(x, y, distance, 2);
-                        p2_tokens.push(Token{newX, newY});
+                        let (new_x, new_y) = increment_location(x, y, distance, 2);
+                        p2_tokens.push(Token{x: new_x, y: new_y});
                     }
                 }
             },
-            MoveType::CreateToken{x, y} => {
+            MoveType::CreateToken{distance} => {
                 if game.player_1 == next_move.author {
-                    p1_tokens.push(Token{x,y});
+                    let dest = increment_location(4, 0, distance, 1);
+                    p1_tokens.push(Token{x: dest.0, y: dest.1});
                 } else {
-                    p2_tokens.push(Token{x,y});
+                    let dest = increment_location(4, 2, distance, 2);
+                    p2_tokens.push(Token{x: dest.0, y: dest.1}); // FIXME not sure if this does anything because it's inside a different block than p2_tokens declaration
                 }
             }
         }
@@ -150,4 +115,43 @@ impl GameState {
         }
     }
 
+}
+
+// takes token location, distance, and player and returns the location where a token at the
+// given location will land if moved the given distance by the given player.
+pub fn increment_location(x: usize, y: usize, distance: usize, player: usize) -> (usize, usize) {
+
+    let mut location = (x, y);
+
+    fn step(x: usize, y: usize, player: usize) -> (usize, usize) {
+        match (x, y) {
+            // merge
+            (0,0) | (0,2) => (0,1),
+            //split
+            (7,1) => {
+                if player == 1 {
+                    (7,0)
+                } else {
+                    (7,2)
+                }
+            },
+            // middle row
+            (_,1) => (x+1,y),
+            // outside rows (only thing left)
+            (_,_) => (x-1,y),
+        }
+    }
+
+    for _n in 1..=distance {
+        location = step(location.0, location.1, player);
+    }
+
+    return location;
+}
+
+// test whether a token moved a given distance from a given location will go home.
+fn is_homing(x: usize, y: usize, distance: usize) -> bool {
+    // player doesn't matter when calculating whether token homes
+    let new_location = increment_location(x, y, distance, 1);
+    return new_location == (5,0) || new_location == (5,2);
 }

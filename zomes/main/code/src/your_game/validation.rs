@@ -7,6 +7,7 @@ use super::{
 use hdk::holochain_persistence_api::cas::content::Address;
 use super::state::Token;
 use super::moves::MoveType;
+use super::state::increment_location;
 
 /**
  *
@@ -30,56 +31,80 @@ impl Move {
         // landed on a rosette)
         is_players_turn(self.author.clone(), &game, &game_state)?;
 
-        // the move length is no more than 4 tiles
-        is_valid_distance(self.distance)?;
+        // get move length
+        let move_distance = match self.move_type {
+            MoveType::CreateToken{distance} => distance,
+            MoveType::MoveToken{x: _, y: _, distance} => distance,
+        };
 
-        // find destination of move
-        if self.author == game.player_1 {
-            let p = 1;
-        } else {
-            let p = 2;
+        // the move length is no more than 4 tiles
+        is_valid_distance(move_distance)?;
+
+        // find which player is moving (1 or 2)
+        fn which_player(author: Address, game: &Game) -> usize {
+            if author == game.player_1 {
+                return 1;
+            } else if author == game.player_2 {
+                return 2;
+            } else {
+                return 100000000; // this should never happen
+            }
         }
-        let destination = game_state.incrementLocation(self.x, self.y, self.distance, p);
+        let p = which_player(self.author.clone(), &game);
+
+        let destination = match self.move_type {
+            MoveType::CreateToken{distance} => {
+                // start one tile before the end of the board and increment
+                if p == 1 {
+                    increment_location(4, 0, distance, p)
+                } else {
+                    increment_location(4, 2, distance, p)
+                }
+            },
+            MoveType::MoveToken{x, y, distance} => {
+                increment_location(x, y, distance, p)
+            },
+        };
 
         // the move destination is not on top of another of the player's tokens (calculate by
         // reducing game state)
         player_can_move_to_tile(self.author.clone(), &game, &game_state, destination)?;
 
         match self.move_type {
-            MoveType::CreateToken => {
+            MoveType::CreateToken{distance: _} => {
                 // the player is not out of tokens (tokens on board + tokens home < 7)
                 player_has_token(self.author.clone(), &game, &game_state)?;
             },
-            MoveType::MoveToken => {
+            MoveType::MoveToken{x, y, distance} => {
                 // a token belonging to the player exists at the from coordinates of the move
-                token_exists(self.author.clone(), &game, &game_state, (self.x, self.y))?;
+                token_exists(self.author.clone(), &game, &game_state, (x, y))?;
 
                 // the move is no more than one tile off the end of the board
-                isnt_overmoving((self.x, self.y), self.distance)?;
+                isnt_overmoving((x, y), distance)?;
             },
         }
-        
+
         Ok(())
     }
 }
 
-fn is_players_turn(player: Address, game: &Game, game_state: &GameState) -> Result<(), String> {
+fn is_players_turn(player: Address, _game: &Game, game_state: &GameState) -> Result<(), String> {
     let moves = &game_state.moves;
     match moves.last() {
         Some(last_move) => {
             // figure out what the location the token landed is
             // there are two ways to do this because of the two move types
-            match last_move.move_type {
-                MoveType::MoveToken => {
+            let location = match last_move.move_type {
+                MoveType::MoveToken{x, y, distance} => {
                     // player doesn't matter when calculating whether token is on rosette
-                    let location = game_state.incrementLocation(last_move.x, last_move.y, last_move.distance, 1);
+                    increment_location(x, y, distance, 1)
                 },
-                MoveType::CreateToken => {
-                    let location = (last_move.x, last_move.y);
+                MoveType::CreateToken{distance} => {
+                    increment_location(0, 4, distance, 1)
                 },
-            }
+            };
 
-            if is_rosette(location) {
+            if is_rosette(location.0, location.1) {
                 if last_move.author == player {
                     // our player landed on rosette and plays again
                     Ok(())
@@ -113,60 +138,55 @@ fn is_players_turn(player: Address, game: &Game, game_state: &GameState) -> Resu
 }
 
 fn player_can_move_to_tile(player: Address, game: &Game, game_state: &GameState, destination: (usize, usize)) -> Result<(), String> {
-    match player {
-        game.player_1 => {
-            // if player 1 is sending a token to a place where they already have a token
-            if game_state.p1_tokens.contains(Token{destination[0], destination[1]}) {
-                Err("You can't move a token onto another of your tokens! P1".into())
-            } else {
-                Ok(())
-            }
-        },
-        game.player_2 => {
-            if game_state.p2_tokens.contains(Token{destination[0], destination[1]}) {
-                Err("You can't move a token onto another of your tokens! P2".into())
-            } else {
-                Ok(())
-            }
-        },
+    let x = destination.0;
+    let y = destination.1;
+    if player == game.player_1 {
+        // if player 1 is sending a token to a place where they already have a token
+        if game_state.p1_tokens.contains(&Token{x, y}) {
+            Err("You can't move a token onto another of your tokens! P1".into())
+        } else {
+            Ok(())
+        }
+    } else {
+        if game_state.p2_tokens.contains(&Token{x, y}) {
+            Err("You can't move a token onto another of your tokens! P2".into())
+        } else {
+            Ok(())
+        }
     }
 }
 
 fn player_has_token(player: Address, game: &Game, game_state: &GameState) -> Result<(), String> {
-    match player {
-        game.player_1 => {
-            if game_state.p1_tokens.len() + game_state.p1_home < 7 {
-                Ok(())
-            } else {
-                Err("You are out of tokens! P1".into())
-            }
-        },
-        game.player_2 => {
-            if game_state.p2_tokens.len() + game_state.p2_home < 7 {
-                Ok(())
-            } else {
-                Err("You are out of tokens! P2".into())
-            }
-        },
+    if player == game.player_1 {
+        if game_state.p1_tokens.len() + game_state.p1_home < 7 {
+            Ok(())
+        } else {
+            Err("You are out of tokens! P1".into())
+        }
+    } else {
+        if game_state.p2_tokens.len() + game_state.p2_home < 7 {
+            Ok(())
+        } else {
+            Err("You are out of tokens! P2".into())
+        }
     }
 }
 
 fn token_exists(player: Address, game: &Game, game_state: &GameState, origin: (usize, usize)) -> Result<(), String> {
-    match player {
-        game.player_1 => {
-            if game_state.p1_tokens.contains(Token{origin[0], origin[1]}) {
-                Ok(())
-            } else {
-                Err("There is not one of your tokens to move on the selected tile P1".into())
-            }
-        },
-        game.player_2 => {
-            if game_state.p2_tokens.contains(Token{origin[0], origin[1]}) {
-                Ok(())
-            } else {
-                Err("There is not one of your tokens to move on the selected tile P2".into())
-            }
-        },
+    let x = origin.0;
+    let y = origin.1;
+    if player == game.player_1 {
+        if game_state.p1_tokens.contains(&Token{x,y}) {
+            Ok(())
+        } else {
+            Err("There is not one of your tokens to move on the selected tile P1".into())
+        }
+    } else {
+        if game_state.p2_tokens.contains(&Token{x,y}) {
+            Ok(())
+        } else {
+            Err("There is not one of your tokens to move on the selected tile P2".into())
+        }
     }
 }
 
@@ -181,7 +201,7 @@ fn isnt_overmoving(origin: (usize, usize), distance: usize) -> Result<(), String
                 Ok(())
             }
         },
-        (7,0|2) => {
+        (7,0) | (7,2) => {
             // distance can't be 3 or 4
             if distance > 2 {
                 Err("You must move off the board exactly! V2".into())
@@ -189,7 +209,7 @@ fn isnt_overmoving(origin: (usize, usize), distance: usize) -> Result<(), String
                 Ok(())
             }
         },
-        (6,0|2) => {
+        (6,0) | (6,2) => {
             // distance can't be 2, 3 or 4 (must be 1)
             if distance > 1 {
                 Err("You must move off the board exactly! V1".into())

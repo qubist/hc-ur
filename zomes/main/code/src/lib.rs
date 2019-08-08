@@ -1,4 +1,4 @@
-#![feature(try_from, vec_remove_item, proc_macro_hygiene)]
+#![feature(vec_remove_item, proc_macro_hygiene)]
 #[macro_use]
 extern crate hdk;
 extern crate serde;
@@ -43,8 +43,13 @@ use matchmaking::{GameProposal, GetResponse};
 #[zome]
 pub mod main {
 
-    #[genesis]
-    pub fn genesis() {
+    #[init]
+    pub fn init() {
+        Ok(())
+    }
+
+    #[validate_agent]
+    pub fn validate_agent(a: EntryValidationData<AgentId>) {
         Ok(())
     }
 

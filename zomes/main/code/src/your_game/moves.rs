@@ -21,6 +21,6 @@ impl MoveType {
 	pub fn describe() -> Vec<MoveType> {
 		// SHOULD RETURN AN EXAMPLE OF EACH VARIENT
 		vec![MoveType::MoveToken{x: 3, y: 0, distance: 2},
-             MoveType::CreateToken{x: 2, y: 0},]
+             MoveType::CreateToken{distance: 2},]
 	}
 }
