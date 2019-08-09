@@ -40,25 +40,15 @@ impl Move {
         // the move length is no more than 4 tiles
         is_valid_distance(move_distance)?;
 
-        // find which player is moving (1 or 2)
-        fn which_player(author: Address, game: &Game) -> usize {
-            if author == game.player_1 {
-                return 1;
-            } else if author == game.player_2 {
-                return 2;
-            } else {
-                return 100000000; // this should never happen
-            }
-        }
         let p = which_player(self.author.clone(), &game);
 
         let destination = match self.move_type {
             MoveType::CreateToken{distance} => {
                 // start one tile before the end of the board and increment
                 if p == 1 {
-                    increment_location(4, 0, distance, p)
+                    increment_location(0, 4, distance, p)
                 } else {
-                    increment_location(4, 2, distance, p)
+                    increment_location(2, 4, distance, p)
                 }
             },
             MoveType::MoveToken{x, y, distance} => {
@@ -88,10 +78,11 @@ impl Move {
     }
 }
 
-fn is_players_turn(player: Address, _game: &Game, game_state: &GameState) -> Result<(), String> {
+fn is_players_turn(player: Address, game: &Game, game_state: &GameState) -> Result<(), String> {
     let moves = &game_state.moves;
     match moves.last() {
         Some(last_move) => {
+            let p = which_player(last_move.author.clone(), &game);
             // figure out what the location the token landed is
             // there are two ways to do this because of the two move types
             let location = match last_move.move_type {
@@ -100,7 +91,11 @@ fn is_players_turn(player: Address, _game: &Game, game_state: &GameState) -> Res
                     increment_location(x, y, distance, 1)
                 },
                 MoveType::CreateToken{distance} => {
-                    increment_location(0, 4, distance, 1)
+                    if p == 1 {
+                        increment_location(4, 0, distance, 1)
+                    } else { // p == 2
+                        increment_location(4, 2, distance, 1)
+                    }
                 },
             };
 
@@ -232,9 +227,20 @@ fn is_rosette(x: usize, y: usize) -> bool {
 }
 
 fn is_valid_distance(d: usize) -> Result<(), String> {
-    if d >= 4 {
+    if d > 4 {
         Err("You can't move more than 4 tiles!".into())
     } else {
         Ok(())
+    }
+}
+
+// find which player is moving (1 or 2)
+fn which_player(author: Address, game: &Game) -> usize {
+    if author == game.player_1 {
+        return 1;
+    } else if author == game.player_2 {
+        return 2;
+    } else {
+        return 100000000; // this should never happen
     }
 }
