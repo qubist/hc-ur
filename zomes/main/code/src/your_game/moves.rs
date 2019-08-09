@@ -11,7 +11,7 @@ use hdk::holochain_json_api::{
 
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq)]
 pub enum MoveType {
-    // <<DEVCAMP-TODO>> YOUR MOVE ENUM VARIENTS HERE
+    // MOVE ENUM VARIENTS HERE
     MoveToken{x: usize, y: usize, distance: usize},
     CreateToken{distance: usize},
     // HomeToken{}?
