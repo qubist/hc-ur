@@ -4,3 +4,5 @@ target/
 .hc
 .cargo/
 Cargo.toml
+Cargo.lock
+zomes/main/code/Cargo.lock
