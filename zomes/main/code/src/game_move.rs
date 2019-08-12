@@ -61,7 +61,7 @@ pub fn definition() -> ValidatingEntryType {
                 		.map_err(|_| "Could not load state during validation")?;
                 	let game = get_game_local_chain(local_chain, &_new_move.game)
                 	    .map_err(|_| "Could not load game during validation")?;
-                    
+
                     _new_move.is_valid(game, state)
                 },
                 _ => {
@@ -73,7 +73,7 @@ pub fn definition() -> ValidatingEntryType {
         links: [
         	from!(
                 "game",
-                link_type: "",
+                link_type: "game->move",
                 validation_package: || {
                     hdk::ValidationPackageDefinition::Entry
                 },
@@ -83,7 +83,7 @@ pub fn definition() -> ValidatingEntryType {
             ),
         	from!(
                 "move",
-                link_type: "",
+                link_type: "move->move",
                 validation_package: || {
                     hdk::ValidationPackageDefinition::Entry
                 },
